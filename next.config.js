@@ -1,7 +1,37 @@
+const { THEME } = require('./blog.config')
+const fs = require('fs')
+const path = require('path')
+const BLOG = require('./blog.config')
+
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true'
+  enabled: BLOG.BUNDLE_ANALYZER
 })
 
+/**
+ * 扫描指定目录下的文件夹名，用于获取当前有几个主题
+ * @param {*} directory
+ * @returns
+ */
+function scanSubdirectories(directory) {
+  const subdirectories = []
+
+  fs.readdirSync(directory).forEach(file => {
+    // 这段代码会将landing排除在可选主题中
+
+    // const fullPath = path.join(directory, file)
+    // const stats = fs.statSync(fullPath)
+    // landing主题默认隐藏掉，一般网站不会用到
+    // if (stats.isDirectory() && file !== 'landing') {
+    //   subdirectories.push(file)
+    // }
+
+    subdirectories.push(file)
+  })
+
+  return subdirectories
+}
+// 扫描项目 /themes下的目录名
+const themes = scanSubdirectories(path.resolve(__dirname, 'themes'))
 module.exports = withBundleAnalyzer({
   images: {
     // 图片压缩
@@ -15,7 +45,8 @@ module.exports = withBundleAnalyzer({
       'source.unsplash.com',
       'p1.qhimg.com',
       'webmention.io',
-      'amazonaws.com'
+      'amazonaws.com',
+      'ko-fi.com'
     ]
   },
   // 默认将feed重定向至 /public/rss/feed.xml
@@ -65,6 +96,24 @@ module.exports = withBundleAnalyzer({
     //     'react-dom': 'preact/compat'
     //   })
     // }
+    // 动态主题：添加 resolve.alias 配置，将动态路径映射到实际路径
+    if (!isServer) {
+      console.log('[加载主题]', path.resolve(__dirname, 'themes', THEME))
+    }
+    config.resolve.alias['@theme-components'] = path.resolve(__dirname, 'themes', THEME)
     return config
+  },
+  experimental: {
+    scrollRestoration: true
+  },
+  exportPathMap: async function (defaultPathMap, { dev, dir, outDir, distDir, buildId }) {
+    // 导出时 忽略/pages/sitemap.xml.js ， 否则报错getServerSideProps
+    const pages = { ...defaultPathMap }
+    delete pages['/sitemap.xml']
+    return pages
+  },
+  publicRuntimeConfig: { // 这里的配置既可以服务端获取到，也可以在浏览器端获取到
+    NODE_ENV_API: process.env.NODE_ENV_API || 'prod',
+    THEMES: themes
   }
 })
